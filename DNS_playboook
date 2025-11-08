@@ -1,0 +1,135 @@
+1. DNS Components
+
+| Component                    | Role                                                 |
+| ---------------------------- | ---------------------------------------------------- |
+| **Resolver (Recursive DNS)** | Queries and caches DNS responses for clients         |
+| **Root Servers**             | Entry point of DNS hierarchy                         |
+| **TLD Servers**              | Handle domains like `.com`, `.org`, `.in`            |
+| **Authoritative Nameserver** | Holds actual DNS records for a domain                |
+| **Zone File**                | Configuration file containing DNS records for a zone |
+
+
+2. Where DNS is Used
+
+Layer	Usage
+Web Access	Resolving website domain names to IPs
+Email	MX records define mail server destinations
+Internal Networks	Service discovery inside Kubernetes / VPC
+CDN / Load Balancing	Geo-based routing using DNS
+Failover Systems	DNS health checks for auto rerouting
+Monitoring Systems	Identify and resolve service endpoints
+
+3. Common DNS Records
+
+| Record    | Purpose                             | Example                                            |
+| --------- | ----------------------------------- | -------------------------------------------------- |
+| **A**     | Maps domain → IPv4                  | `example.com → 93.184.216.34`                      |
+| **AAAA**  | Maps domain → IPv6                  | `example.com → 2606:2800:220:1:248:1893:25c8:1946` |
+| **CNAME** | Alias one domain to another         | `www → example.com`                                |
+| **MX**    | Mail servers                        | `mail.example.com`                                 |
+| **TXT**   | Text data (SPF, DKIM, etc.)         | `"v=spf1 include:_spf.google.com"`                 |
+| **NS**    | Points to authoritative nameservers | `ns1.exampledns.com`                               |
+| **SRV**   | Service location                    | `_sip._tcp.example.com`                            |
+| **PTR**   | Reverse DNS lookup                  | `34.216.184.93.in-addr.arpa → example.com`         |
+
+
+4. Common DNS Issues (Basic)
+| Issue                  | Cause                               | Fix                                                                      |
+| ---------------------- | ----------------------------------- | ------------------------------------------------------------------------ |
+| ❌ Domain not resolving | Typo, expired domain, wrong NS      | Check WHOIS, domain validity, registrar NS                               |
+| 🕐 Slow DNS response   | Remote resolver, poor caching       | Use nearby DNS servers or CDN-based DNS                                  |
+| ⚡ TTL too high         | Cached outdated IPs after migration | Lower TTL before changes                                                 |
+| 🧠 DNS cache stale     | Old record still cached             | Flush DNS cache (`ipconfig /flushdns`, `systemd-resolve --flush-caches`) |
+
+
+5. Intermediate Issues
+| Issue                       | Cause                         | Fix                                                      |
+| --------------------------- | ----------------------------- | -------------------------------------------------------- |
+| 🌐 Propagation delay        | Global DNS caches not updated | Wait for TTL expiry or use low-TTL for critical services |
+| 🔄 CNAME chain too long     | Multiple redirects            | Flatten CNAMEs                                           |
+| 🚫 Missing or wrong MX/TXT  | Misconfigured email DNS       | Validate with `dig mx`, `dig txt`                        |
+| 🔒 DNS spoofing / poisoning | Compromised resolver          | Use DNSSEC or trusted resolvers (1.1.1.1 / 8.8.8.8)      |
+
+
+6. Advanced / SRE-Level Issues
+| Issue                       | Symptom                                  | Root Cause                   | Mitigation                                                        |
+| --------------------------- | ---------------------------------------- | ---------------------------- | ----------------------------------------------------------------- |
+| 🧨 DNS Amplification Attack | High inbound UDP traffic                 | Exploited open resolvers     | Use rate limiting, block spoofed IPs                              |
+| 🧩 Split-horizon DNS        | Different records inside/outside network | Confusing zone configs       | Standardize internal/external zone mgmt                           |
+| 🧭 GeoDNS misrouting        | Wrong region responses                   | Incorrect GeoIP DB           | Validate GeoDNS provider routing                                  |
+| ☁️ Multi-cloud DNS drift    | Records differ between clouds            | Poor automation              | Use IaC (Terraform, ExternalDNS)                                  |
+| ⏳ Latency in failover       | DNS-based failover not instant           | High TTL values              | Lower TTLs, use health checks (Route53, Cloudflare Load Balancer) |
+| 🔐 DNSSEC misconfiguration  | Domain fails to resolve                  | Bad key signing or DS record | Validate with `dnsviz.net` or `dig +dnssec`                       |
+
+SRE Monitoring & Observability for DNS
+
+| Tool / Metric                           | Purpose                                             |
+| --------------------------------------- | --------------------------------------------------- |
+| `dig`, `nslookup`, `host`               | Query and debug DNS manually                        |
+| **Prometheus DNS Exporter**             | Monitor query rates, response times                 |
+| **Grafana dashboards**                  | Visualize DNS latency & error rates                 |
+| **External probes (Pingdom, Uptrends)** | Global DNS health monitoring                        |
+| **Synthetic tests**                     | Verify end-to-end resolution                        |
+| **Centralized Logging**                 | Log DNS queries (via BIND logs or resolver metrics) |
+
+
+DNS Automation & Reliability Engineering : Tools and Best Practices:
+
+🔄 Infrastructure as Code (IaC):    Manage DNS records using Terraform, Ansible, or Pulumi.
+
+🧱 Immutable Infrastructure:     Keep zone files version-controlled (GitOps for DNS).
+
+⚙️ Automated Health Checks:       Integrate with Route53/Cloudflare failover routing.
+
+🧮 Dynamic DNS (DDNS):           Auto-update IPs for dynamic environments.
+
+🧰 Use Managed DNS Services:     AWS Route53, Google Cloud DNS, Cloudflare DNS, Akamai Fast DNS.
+
+🔐 Enable DNSSEC:               Prevent spoofing and cache poisoning.
+
+DNS Troubleshooting Commands (SRE Quick Reference)
+# Check A record                     dig example.com +short
+# Query specific record type         dig example.com MX
+# Check authoritative nameservers    dig example.com NS
+# Trace DNS resolution path          dig example.com +trace
+# Query specific nameserver          dig @8.8.8.8 example.com
+# Flush local DNS cache              sudo systemd-resolve --flush-caches      ipconfig /flushdns
+
+Key Metrics:
+DNS query latency (p95 < 300ms)
+Error rate (NXDOMAIN, SERVFAIL)
+Cache hit ratio
+Resolver uptime
+
+DNS Change Management Playbook
+
+| Step | Action                                 |
+| ---- | -------------------------------------- |
+| 1️⃣  | Audit current DNS records              |
+| 2️⃣  | Lower TTL for affected zones           |
+| 3️⃣  | Apply and verify new records           |
+| 4️⃣  | Use `dig` to confirm propagation       |
+| 5️⃣  | Monitor latency and resolution         |
+| 6️⃣  | Restore higher TTL once stable         |
+| 7️⃣  | Document and commit changes (IaC repo) |
+
+
+Best Practices Summary
+✅ Use low TTLs for dynamic or failover services
+✅ Use DNSSEC for integrity
+✅ Version control DNS configs
+✅ Monitor query latency and error rates
+✅ Distribute authoritative servers geographically
+✅ Test DNS changes in staging first
+✅ Have fallback resolvers (8.8.8.8, 1.1.1.1)
+
+Example DNS Reliability Architecture (SRE Level)
+Multi-region authoritative DNS (Cloudflare + Route53)
+DNSSEC enabled
+Health-checked weighted routing (50/50 across 2 regions)
+Failover policy via health probes
+Terraform-managed DNS records
+Prometheus alerting on DNS resolution latency > 300ms
+# Check TTL and expiry               dig example.com +ttlunits
+# DNSSEC validation                  dig example.com +dnssec
+
